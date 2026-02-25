@@ -1,0 +1,13 @@
+# --- Python Dependencies ---
+pymupdf==1.27.1
+pikepdf==9.5.0
+
+# --- External System Requirement ---
+# NOTE: For 'Heavy Strike' (Ghostscript) support, you MUST install 
+# Ghostscript separately on your OS (e.g., 'brew install ghostscript' on macOS).
+
+## Used with following dependencies:
+# [+] PyMuPDF (fitz):  v1.27.1
+# [+] Python Core:     v3.14.0
+# [+] Operating System: Darwin (25.3.0)
+# [+] Ghostscript:     v10.06.0

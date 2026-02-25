@@ -1,0 +1,52 @@
+# --- OS spezifische Dateien ---
+.DS_Store
+Thumbs.db
+
+# --- Python Internals ---
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# --- Deine spezifischen Verbote ---
+# Alle PDFs ignorieren
+*.pdf
+
+# Bilder und Medien ignorieren
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+
+# Datenbanken und Excel/CSV
+*.db
+*.sqlite
+*.sqlite3
+*.csv
+*.xlsx
+
+# Textdateien generell ignorieren...
+*.txt
+*.log
+*.md
+
+# ...ABER Ausnahmen für wichtige Dokumente definieren:
+!requirements.txt
+!README.md
+!LICENSE
+!LICENSE.txt
+
+# Ordner ignorieren
+OLD/
+temp/
+dist/
+build/
+
+# Toolkit-spezifische Loot-Ordner
+pages_*/
+loot_*/
+split_*/
