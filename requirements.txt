@@ -1,7 +1,9 @@
 # --- Python Dependencies ---
 pymupdf==1.27.1
 pikepdf==9.5.0
+pillow>=10.0.0
 
+# Note: pymupdf>=1.24.0
 # --- External System Requirement ---
 # NOTE: For 'Heavy Strike' (Ghostscript) support, you MUST install 
 # Ghostscript separately on your OS (e.g., 'brew install ghostscript' on macOS).

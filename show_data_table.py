@@ -2,7 +2,7 @@
 
 def print_scout_table(scout_data):
     """Kompakte Übersicht für Option 1: Scout."""
-    print("\n" + "╔" + "═"*58 + "╗")
+    print("\n" + "╔" + "═"*55 + "╗")
     print(f"║ {'PG':<3} ║ {'SIZE (KB)':<12} ║ {'IMGS':<4} ║ {'FORMATS':<25} ║")
     print("╟" + "─"*5 + "╫" + "─"*14 + "╫" + "─"*6 + "╫" + "─"*27 + "╢")
     
@@ -11,10 +11,10 @@ def print_scout_table(scout_data):
         fmt_str = ", ".join(row['formats']) if row['formats'] else "-"
         print(f"║ {row['page']:<3} ║ {row['size']:>12.2f} ║ {row['img_count']:<4} ║ {fmt_str:<25} ║")
     
-    print("╚" + "═"*58 + "╝")
+    print("╚" + "═"*55 + "╝")
 
 def print_metadata_table(metadata):
-    print("\n" + "═"*75)
+    print("\n" + "╔" + "═"*73 + "╗")
     print(f"║ {'METADATA KEY':<20} ║ {'VALUE':<48} ║")
     print("╟" + "─"*22 + "╫" + "─"*50 + "╢")
     for key, value in metadata.items():
@@ -27,40 +27,50 @@ def print_metadata_table(metadata):
 
 # Datei: /Users/degge/MyProjects/swithArmyPdf/show_data_table.py
 
-def print_recon_master_table(recon_data):
+def print_recon_master_table(recon_data): # Hier heißt es 'recon_data'
     """Präzise kalibrierte Tabelle für Page-Stats, Bilder, DPI und Typ."""
-    # Gesamtlänge: 110 Zeichen
-    header = f"║ {'PG':<3} ║ {'SIZE (KB)':<10} ║ {'IMG':<3} ║ {'PIXELS (px)':<16} ║ {'DPI':<5} ║ {'TYPE':<6} ║ {'COLORSPACE':<35} ║"
-    sep_main = "╟" + "─"*5 + "╫" + "─"*12 + "╫" + "─"*5 + "╫" + "─"*18 + "╫" + "─"*7 + "╫" + "─"*8 + "╫" + "─"*37 + "╢"
-    
-    print("\n╔" + "═"*108 + "╗")
+    header =  "║ PG  ║ ∑SIZE (KB) ║ SIZE (KB) ║ IMG ║ PIXELS (px)   ║  Q[%;bpp]  ║ DPI   ║ TYPE   ║ COLORSPACE                          ║"
+    sep_mid = "╟─────╫────────────╫───────────╫─────╫───────────────╫────────────╫───────╫────────╫─────────────────────────────────────╢"
+
+    print("\n" + "╔" + "═" * (len(header) - 2) + "╗")
     print(header)
-    print(sep_main)
-    
-    for row in recon_data:
-        imgs = row['images']
-        pg_num = str(row['page'])
-        pg_size = f"{row['size']:>10.2f}"
-        img_count = str(row['img_count'])
-        
-        if not imgs:
-            # Zeile für Seiten ohne Bilder
-            print(f"║ {pg_num:<3} ║ {pg_size:<10} ║ {img_count:<3} ║ {'no images':<16} ║ {'-':<5} ║ {'-':<6} ║ {'-':<35} ║")
-        else:
-            for i, img in enumerate(imgs):
-                # Nur in der ersten Zeile eines Seiten-Blocks die Seitendaten zeigen
-                curr_pg = pg_num if i == 0 else ""
-                curr_sz = pg_size if i == 0 else ""
-                curr_cnt = img_count if i == 0 else ""
-                
-                dims = f"{img['w']}x{img['h']}"
-                dpi = str(img['dpi'])
-                ext = img['ext']
-                cs = img['cs'][:33] # Kürzen falls zu lang
-                
-                print(f"║ {curr_pg:<3} ║ {curr_sz:<10} ║ {curr_cnt:<3} ║ {dims:<16} ║ {dpi:<5} ║ {ext:<6} ║ {cs:<35} ║")
-    
-    print("╚" + "═"*108 + "╝")
+    print(sep_mid)
+
+    grand_total_size = 0
+
+    for res in recon_data:
+        pg = res["page"]
+        total_size = res["size"]
+        img_count = res["img_count"]
+        images = res["images"]
+
+        grand_total_size += total_size
+
+        if not images:
+            # Fall: Seite ohne Bilder (nur Text/Vektoren)
+            row = f"║ {pg:<3} ║ {total_size:>10.2f} ║ {'-':>9} ║ 0   ║ {'-':<13} ║ {'-':<10} ║ {'-':<5} ║ {'-':<6} ║ {'No Images':<35} ║"
+            print(row)
+            continue
+
+        for i, img in enumerate(images):
+            # Logik für die Gruppierung: PG und ∑SIZE nur in der ersten Zeile der Seite
+            pg_str = str(pg) if i == 0 else ""
+            total_size_str = f"{total_size:>10.2f}" if i == 0 else " " * 10
+            img_count_str = str(img_count) if i == 0 else ""
+
+            # Pixel-String (Breite x Höhe)
+            res_str = f"{img['w']}x{img['h']}"
+
+            # Formatierte Zeile
+            row = (
+                f"║ {pg_str:<3} ║ {total_size_str} ║ {img['size_kb']:>9.2f} ║ {img_count_str:<3} ║ "
+                f"{res_str:<13} ║ {img['q_val']:<10} ║ {img['dpi']:<5} ║ {img['ext']:<6} ║ {img['cs']:<35} ║"
+            )
+            print(row)
+
+    # Abschluss der Tabelle
+    print("╚" + "═" * (len(header) - 2) + "╝")
+    print(f" ∑ = {grand_total_size / 1024:.2f} MB\n")
     
 def print_page_size_table(page_data):
     print("\n" + "╔" + "═"*32 + "╗")

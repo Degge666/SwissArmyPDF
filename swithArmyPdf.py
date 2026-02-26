@@ -1,8 +1,9 @@
-sAPDFVString = "0.1 ⍺"
+sAPDFVString = "0.2 ⍺"
 import fitz
 import os
 import subprocess
 import sys
+from utility import analyze_compression
 from show_data_table import print_metadata_table, print_recon_master_table
 def print_banner():
     print(f"\n--- SWISS ARMY PDF TOOLKIT ({sAPDFVString}) ---")
@@ -385,33 +386,45 @@ def sabotage_patch_Mini(filepath):
         print(f"[!] Sabotage Error: {e}")
 
 def heavy_strike_gs(filepath):
-    """Radikale Kompression via Ghostscript unter Erhalt der Text-Layer."""
+    """Radikale Kompression via Ghostscript - Optimiert für GS 10.x."""
+    import os, subprocess
     print(f"\n[!] Heavy Strike Mission (Ghostscript): {os.path.basename(filepath)}")
 
     try:
-        # 1. DPI Abfrage
+        # 1. Inputs mit Defaults
         limit_input = input("Target DPI [Standard 150]: ").strip()
         target_dpi = limit_input if limit_input else "150"
 
-        # 2. Zielpfad über die neue zentrale Funktion abfragen
+        q_input = input("Quality 1...100% [Standard 90]: ").strip()
+        quality_val = int(q_input) if q_input else 90
+
+        # Berechnung des QFactors (GS intern)
+        q_factor = (100 - quality_val) / 100
+
+        # 2. Zielpfad über deine Helper-Funktion
         out_path = get_save_path(filepath, "gs_compressed")
 
-        # 3. Ghostscript Kommando vorbereiten
+        # 3. Das finale, getestete Kommando
+        # 3. Das stabilste Kommando ohne bevormundende Profile
         cmd = [
-            "gs", "-sDEVICE=pdfwrite",
+            "gs",
+            "-sDEVICE=pdfwrite",
             "-dCompatibilityLevel=1.4",
-            "-dPDFSETTINGS=/ebook",
-            f"-dColorImageResolution={target_dpi}",
-            f"-dGrayImageResolution={target_dpi}",
-            f"-dMonoImageResolution={target_dpi}",
-            "-dDownsampleColorImages=true",
-            "-dDownsampleGrayImages=true",
-            "-dDownsampleMonoImages=true",
-            "-dEmbedAllFonts=true",
-            "-dSubsetFonts=true",
             "-dNOPAUSE", "-dQUIET", "-dBATCH",
             f"-sOutputFile={out_path}",
-            filepath
+            # Erzwinge Neuberechnung aller Bilder
+            "-dColorImageFilter=/DCTEncode",
+            "-dGrayImageFilter=/DCTEncode",
+            f"-dColorImageResolution={target_dpi}",
+            f"-dGrayImageResolution={target_dpi}",
+            "-dAutoFilterColorImages=false",
+            "-dAutoFilterGrayImages=false",
+            "-dDownsampleColorImages=true",
+            "-dDownsampleGrayImages=true",
+            # Die Qualitätsparameter direkt übergeben
+            "-c",
+            f"<< /ColorImageDict << /JPEGQ {quality_val} /QFactor {q_factor} >> /GrayImageDict << /JPEGQ {quality_val} /QFactor {q_factor} >> >> setdistillerparams",
+            "-f", filepath
         ]
 
         # Strike ausführen
@@ -419,14 +432,15 @@ def heavy_strike_gs(filepath):
 
         # 4. Erfolgskontrolle
         if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
-            old_size = os.path.getsize(filepath) / 1024
-            new_size = os.path.getsize(out_path) / 1024
+            old_size = os.path.getsize(filepath)
+            new_size = os.path.getsize(out_path)
+            # Ersparnis berechnen
+            savings = (1 - (new_size / old_size)) * 100
             print(f"\n[*] MISSION ACCOMPLISHED")
-            print(f"[*] Saved to: {out_path}")
-            print(f"[*] Damage Report: {old_size:.2f} KB -> {new_size:.2f} KB")
+            print(f"[*] Saved to: {os.path.basename(out_path)}")
+            print(f"[*] Damage Report: {old_size / 1024:.1f} KB -> {new_size / 1024:.1f} KB (-{savings:.1f}%)")
             return out_path
         else:
-            # Spezifische Fehlermeldung, falls GS nichts erzeugt hat
             print(f"\n[!] MISSION FAILED: Ghostscript output missing.")
             if result.stderr:
                 print(f"[!] System Message: {result.stderr}")
@@ -440,39 +454,39 @@ def heavy_strike_gs(filepath):
 def deep_recon(filepath):
     """
     Führt eine tiefen-forensische Analyse des PDFs durch.
-    Ermittelt Seitengrößen, eingebettete Bilder, deren DPI, Typ und Farbraum.
     """
     print(f"\n[+] Deep Forensic Recon: {filepath}")
+
+    # 1. WICHTIG: Liste AUSSERHALB des try initialisieren
+    recon_results = []
+
     try:
         doc = fitz.open(filepath)
-        recon_results = []
 
         for i in range(len(doc)):
             page = doc[i]
-            
-            # 1. Seitengröße isoliert messen (Bulletproof Methode)
+
+            # Seitengröße messen (∑SIZE Wert)
             temp_doc = fitz.open()
             temp_doc.insert_pdf(doc, from_page=i, to_page=i)
             p_size = len(temp_doc.convert_to_pdf()) / 1024
             temp_doc.close()
 
-            # 2. Physische Maße der Seite in Zoll (72 points = 1 inch)
             page_w_inch = page.rect.width / 72
-            
-            # 3. Bilder auf der aktuellen Seite extrahieren
             page_imgs = page.get_images()
             img_details = []
-            
+
             for img in page_imgs:
                 xref = img[0]
-                # Wir nutzen extract_image für Metadaten (Typ, Breite, Höhe)
                 base_img = doc.extract_image(xref)
-                
+
                 if base_img:
-                    # Farbenraum-Ermittlung mit Fallback auf Pixmap
-                    cs_name = base_img.get("colorspace", "Unknown") # extract_image nutzt oft int oder name
-                    
-                    # Wenn Farbenraum unklar ist, Pixmap als Sonde nutzen
+                    # Aufruf der Funktion aus utility.py
+                    q_val = analyze_compression(base_img["image"], base_img["width"], base_img["height"],
+                                                base_img["ext"].upper())
+
+                    # Farbenraum-Sonde
+                    cs_name = base_img.get("colorspace", "Unknown")
                     if cs_name == "Unknown" or not cs_name or isinstance(cs_name, int):
                         try:
                             pix = fitz.Pixmap(doc, xref)
@@ -481,19 +495,18 @@ def deep_recon(filepath):
                         except:
                             cs_name = "n/a"
 
-                    # DPI Schätzung: Pixelbreite / Seitenbreite in Zoll
-                    # (Gibt an, wie hoch das Bild aufgelöst wäre, wenn es seitenfüllend wäre)
                     dpi_est = int(base_img["width"] / page_w_inch) if page_w_inch > 0 else 0
-                    
+
                     img_details.append({
+                        "size_kb": len(base_img["image"]) / 1024,
                         "w": base_img["width"],
                         "h": base_img["height"],
                         "cs": cs_name,
+                        "q_val": q_val,
                         "dpi": dpi_est,
-                        "ext": base_img["ext"].upper() # JPEG, PNG, JPX etc.
+                        "ext": base_img["ext"].upper()
                     })
 
-            # Ergebnisse für diese Seite sammeln
             recon_results.append({
                 "page": i + 1,
                 "size": p_size,
@@ -501,14 +514,17 @@ def deep_recon(filepath):
                 "images": img_details
             })
 
-        # Übergabe an die (jetzt perfekt ausgerichtete) Tabelle
-        from show_data_table import print_recon_master_table
-        print_recon_master_table(recon_results)
-        
         doc.close()
-    except Exception as e:
-        print(f"[!] Recon Error: {e}")
 
+        # 2. Die Tabelle nur drucken, wenn Daten da sind
+        if recon_results:
+            print_recon_master_table(recon_results)
+        else:
+            print("[!] Mission failure: No data collected.")
+
+    except Exception as e:
+        # Jetzt wird 'e' ausgegeben, was uns den echten Grund verrät
+        print(f"[!] Recon Error: {e}")
 
 def split_scroll(filepath):
     """Teilt die Schriftrolle in einzelne Seiten auf."""
@@ -531,7 +547,6 @@ def split_scroll(filepath):
         print(f"[*] Victory! Pages scattered into: {output_dir}")
     except Exception as e:
         print(f"[!] Split Error: {e}")
-
 
 def merge_scrolls():
     """Schmiedet mehrere Schriftrollen zu einer zusammen."""
@@ -708,7 +723,8 @@ def main():
         print("\n--- Command Menu ------ Analyze PDF ---:")
         print("a) Page Sizes (simple)        b) Advanced Page Info      c) PDF Intel (Tech-Check)")
         print("--- Manipulate PDF to Reduce Size ---:")
-        print("1) Heavy Strike (GS)          2) Purge/Clean             22) Smart Sabotage (DPI)")
+        #print("1) Heavy Strike (GS)          2) Purge/Clean             22) Smart Sabotage (DPI)")
+        print("1) Heavy Strike (GS)          2) Purge/Clean")
         print("--- Manipulate PDF MISC ---:")
         print("10) Split PDF                 11) Merge PDF              12) Loot (Extract Imgs)")
         print("13) Pages to JPG (DPI)        14) Pages to JPG (Fixed Res)") # <-- NEU
@@ -724,7 +740,7 @@ def main():
         elif choice == 'c': technical_intel(current_path)
         elif choice == '1': new_file = heavy_strike_gs(current_path)
         elif choice == '2': new_file = purge_waste(current_path)
-        elif choice == '22': sabotage_patch_Mini(current_path)
+        #elif choice == '22': sabotage_patch_Mini(current_path)
         elif choice == '10': split_scroll(current_path)
         elif choice == '11': new_file = merge_scrolls() # result = merge_scrolls()
         elif choice == '12': extract_loot(current_path)
