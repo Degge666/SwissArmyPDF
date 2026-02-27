@@ -1,41 +1,41 @@
-sAPDFVString = "0.2 ⍺"
+toolNameame = "SWISS ARMY PDF TOOLKIT"
+sAPDFVString = "0.21 ⍺"
 import fitz
 import os
 import subprocess
 import sys
 from utility import analyze_compression
 from show_data_table import print_metadata_table, print_recon_master_table
+
 def print_banner():
-    print(f"\n--- SWISS ARMY PDF TOOLKIT ({sAPDFVString}) ---")
-    #v = fitz.version[0] if hasattr(fitz, "version") else "Legacy"
-    #print(f"\n--- SWISS ARMY PDF TOOLKIT (v{v}) ---")
+    print(f"\n--- ({toolNameame}) ({sAPDFVString}) ---")
 
 def show_toolkit_intel():
-    """Zeigt Versionen der verwendeten Bibliotheken und System-Tools an."""
-    print(f"\n{'=' * 20} TOOLKIT INTEL {'=' * 20}")
+    """Versions of installed libraries and tools of interest."""
+    print(f"\n{'=' * 17} VERSION TABLE {'=' * 17}")
 
     # 1. PyMuPDF Info
     v_fitz = fitz.version[0] if hasattr(fitz, "version") else "Unknown"
-    print(f"[+] PyMuPDF (fitz):  v{v_fitz}")
+    print(f"[+] PyMuPDF (fitz):       v{v_fitz}")
 
     # 2. Python Info
     v_python = sys.version.split()[0]
-    print(f"[+] Python Core:     v{v_python}")
+    print(f"[+] Python Core:          v{v_python}")
 
     # 3. OS Info
     import platform
-    print(f"[+] Operating System: {platform.system()} ({platform.release()})")
+    print(f"[+] Operating System:     {platform.system()} ({platform.release()})")
 
     # 4. Ghostscript Check (Externes Tool)
     try:
         # Versucht 'gs -v' oder 'gswin64c -v' aufzurufen
         gs_cmd = "gswin64c" if os.name == "nt" else "gs"
         gs_version = subprocess.check_output([gs_cmd, "--version"], stderr=subprocess.STDOUT).decode().strip()
-        print(f"[+] Ghostscript:     v{gs_version}")
+        print(f"[+] Ghostscript:          v{gs_version}")
     except (subprocess.CalledProcessError, FileNotFoundError):
-        print(f"[!] Ghostscript:     NOT FOUND (Heavy Strike will fail!)")
+        print(f"[!] Ghostscript:          NOT FOUND (Heavy Strike will fail!)")
 
-    print(f"{'=' * 55}")
+    print(f"{'=' * 49}")
     input("\nPress Enter to return to the command menu...")
 
 def get_save_path(original_path, suffix):
@@ -47,7 +47,7 @@ def get_save_path(original_path, suffix):
     if not user_input:
         return suggested
 
-    # Pfad-Logik (User gibt nur Namen oder ganzen Pfad an)
+    # Pfad-Logic (File Namen or full path)
     if os.sep in user_input or "/" in user_input:
         return user_input.replace("'", "").replace('"', "").strip()
     else:
@@ -240,6 +240,7 @@ def scout_pdf(filepath):
         from show_data_table import print_scout_table
         print_scout_table(scout_results)
         doc.close()
+        input("\nPress Enter to return to the command menu...")
     except Exception as e:
         print(f"[!] Scout Error: {e}")
 
@@ -522,12 +523,15 @@ def deep_recon(filepath):
         else:
             print("[!] Mission failure: No data collected.")
 
+
     except Exception as e:
         # Jetzt wird 'e' ausgegeben, was uns den echten Grund verrät
         print(f"[!] Recon Error: {e}")
 
+    input("\nPress Enter to return to the command menu...")
+
 def split_scroll(filepath):
-    """Teilt die Schriftrolle in einzelne Seiten auf."""
+    """Splitting PDF"""
     print(f"\n[+] Splitting Scroll: {filepath}")
     try:
         doc = fitz.open(filepath)
@@ -549,7 +553,7 @@ def split_scroll(filepath):
         print(f"[!] Split Error: {e}")
 
 def merge_scrolls():
-    """Schmiedet mehrere Schriftrollen zu einer zusammen."""
+    """Merge Pages to PDF."""
     print("\n[+] Preparation for Forge: Merging multiple scrolls.")
     target_name = input("Enter name for the new forged scroll (e.g. combined.pdf): ").strip()
     if not target_name.endswith(".pdf"): target_name += ".pdf"
@@ -729,7 +733,7 @@ def main():
         print("10) Split PDF                 11) Merge PDF              12) Loot (Extract Imgs)")
         print("13) Pages to JPG (DPI)        14) Pages to JPG (Fixed Res)") # <-- NEU
         print("--- Control ---:")
-        print("n) Select PDF (Change)        i) Toolkit Info            q) Quit")
+        print("n) Select PDF (Change)        i) Version table           q) Quit")
 
         choice = input("\nAction: ").lower()
         new_file = None

@@ -1,4 +1,4 @@
-# SwissArmyPDF (sAPDF) Toolkit - v0.2 ⍺ 🇨🇭📄
+# SwissArmyPDF (sAPDF) Toolkit - v0.2.1 ⍺ 🇨🇭📄
 
 A precision forensic toolchain for PDF reconnaissance, asset looting, and surgical optimization. Developed for security researchers and power users who need deep insights into PDF structures.
 
@@ -45,7 +45,7 @@ Developed and tested under the following conditions:
 ## ⚖️ License & Disclaimer
 This tool is provided under the MIT License. Use it wisely. The authors are not responsible for any data loss or corrupted scrolls resulting from the use of this software.
 
-Status: Alpha v0.2 - The forge is still hot.
+Status: Alpha v0.2.1 - The forge is still hot.
 
 
 ## 🗺️ Roadmap & Planned Missions
