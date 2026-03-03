@@ -1,11 +1,12 @@
 toolNameame = "SWISS ARMY PDF TOOLKIT"
-sAPDFVString = "0.21 ⍺"
+sAPDFVString = "0.2.2 ⍺"
 import fitz
 import os
 import subprocess
 import sys
 from utility import analyze_compression
 from show_data_table import print_metadata_table, print_recon_master_table
+from replace_PDF_Content import interactive_image_replacer
 
 def print_banner():
     print(f"\n--- ({toolNameame}) ({sAPDFVString}) ---")
@@ -728,7 +729,7 @@ def main():
         print("a) Page Sizes (simple)        b) Advanced Page Info      c) PDF Intel (Tech-Check)")
         print("--- Manipulate PDF to Reduce Size ---:")
         #print("1) Heavy Strike (GS)          2) Purge/Clean             22) Smart Sabotage (DPI)")
-        print("1) Heavy Strike (GS)          2) Purge/Clean")
+        print("1) Heavy Strike (GS)          2) Purge/Clean             4) Replace Image with PDF/Image")
         print("--- Manipulate PDF MISC ---:")
         print("10) Split PDF                 11) Merge PDF              12) Loot (Extract Imgs)")
         print("13) Pages to JPG (DPI)        14) Pages to JPG (Fixed Res)") # <-- NEU
@@ -744,6 +745,20 @@ def main():
         elif choice == 'c': technical_intel(current_path)
         elif choice == '1': new_file = heavy_strike_gs(current_path)
         elif choice == '2': new_file = purge_waste(current_path)
+        elif choice == '4':
+            print(f"\nCurrent Source: {current_path}")
+            source_input = input("Enter Source PDF Path [Press Enter to use current]: ").strip()
+            main_pdf = source_input if source_input else current_path
+            new_file = interactive_image_replacer(main_pdf)
+            # if new_file:
+            #    current_path = new_file
+            #new_file = purge_waste(current_path)
+            #print(f"\nCurrent Source: {current_path}")
+            #source_input = input("Enter Source PDF Path [Press Enter to use current]: ").strip()
+            #replacement_source = source_input if source_input else current_path
+            #out_path = get_save_path(current_path, "_ReplacedContent")
+            #new_file = interactive_image_replacer(replacement_source, replacement_source, out_path)
+
         #elif choice == '22': sabotage_patch_Mini(current_path)
         elif choice == '10': split_scroll(current_path)
         elif choice == '11': new_file = merge_scrolls() # result = merge_scrolls()

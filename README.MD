@@ -1,7 +1,7 @@
-# SwissArmyPDF (sAPDF) Toolkit - v0.2.1 ⍺ 🇨🇭📄
+# SwissArmyPDF (sAPDF) Toolkit - v0.2.2 ⍺ 🇨🇭📄
 
 A precision forensic toolchain for PDF reconnaissance, asset looting, and surgical optimization. Developed for security researchers and power users who need deep insights into PDF structures.
-
+nn
 ## 🛡️ System Intelligence
 Developed and tested under the following conditions:
 * **OS:** Darwin 25.3.0 (macOS)
@@ -52,10 +52,15 @@ Status: Alpha v0.2.1 - The forge is still hot.
 
 The toolkit is constantly being forged. The following capabilities are currently being scouted for implementation:
 
-* **[X] Tactical Merging & Splitting:** Surgical precision for combining multiple PDF assets or extracting specific intel (pages). (Basic implementation active)
 * **[ ] Enhanced Loot-Table:** Upgrading the loot tracking system with timestamps and origin metadata to see exactly when and where assets were captured.
 * **[ ] Visual Recon Overhaul: Color-coded tables (Green-to-Red) based on asset size and BPP quality metrics.
 * **[ ] Advanced Image Intelligence (PNG/JPG and Transparancy):**
     * **Transparency Guard:** Automatic detection of Alpha channels in PNGs to prevent "black-background" sabotage during JPG conversion.
     * **Lossless Transfer:** Optimized conversion routines between PNG and JPG based on DPI requirements.
 * **[ ] Flexible Depot (Storage):** Implementation of custom output paths and structured storage for extracted loot, moving beyond simple local folders.
+
+# History
+## Added in v0.2.1 ⍺ 🇨🇭📄
+* **[X] Tactical Merging & Splitting:** Surgical precision for combining multiple PDF assets or extracting specific intel (pages). (Basic implementation active)
+## Added in v0.2.2 ⍺ 🇨🇭📄
+* **[X]  Replace Image with PDF/Image:**  see "4)"

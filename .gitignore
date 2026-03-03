@@ -40,8 +40,9 @@ venv/
 !LICENSE
 !LICENSE.txt
 
-# Ordner ignorieren
+# Orqdner ignorieren
 OLD/
+Backlog/
 temp/
 dist/
 build/
