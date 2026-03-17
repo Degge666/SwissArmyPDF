@@ -1,3 +1,4 @@
+#interfaces/gui_window.py
 import os
 import json
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
@@ -15,13 +16,16 @@ class SortableTreeWidgetItem(QTreeWidgetItem):
     def __lt__(self, other):
         column = self.treeWidget().sortColumn()
         text1 = self.text(column)
-        text2 = other.text(column)  # Fix: 'other' fehlte in deiner Version
+        text2 = other.text(column)
 
-        # Versuche numerisch zu sortieren (XREF, Size, Page)
+        # Versuche, beide Werte als Zahlen zu vergleichen
         try:
-            return float(text1) < float(text2)
+            # Entferne Einheiten wie ' KB' für den Vergleich, falls vorhanden
+            val1 = float(text1.replace(' KB', '').replace('x', '.'))
+            val2 = float(text2.replace(' KB', '').replace('x', '.'))
+            return val1 < val2
         except ValueError:
-            # Fallback auf String-Sortierung (Format, Hash, etc.)
+            # Fallback auf Text-Sortierung
             return text1.lower() < text2.lower()
 
 class MainWindow(QMainWindow):
@@ -298,6 +302,8 @@ class MainWindow(QMainWindow):
     def _add_image_item_from_list(self, data, parent, get_col, search, is_flat):
         xr, sz, w, h, flt, bpc, cs, sub, hsh, alpha, pnum, dpi = data
 
+        item = SortableTreeWidgetItem(parent)
+
         # Format Mapping
         fmt_map = {"DCTDecode": "JPG", "FlateDecode": "PNG/ZLIB", "JPXDecode": "JP2000", "JBIG2Decode": "JBIG2"}
         display_fmt = fmt_map.get(flt, flt.split("/")[-1] if flt and "/" in flt else (flt if flt else "RAW"))
@@ -311,20 +317,23 @@ class MainWindow(QMainWindow):
         item = SortableTreeWidgetItem(parent)
 
         # In der flachen Ansicht schreiben wir die Seitenzahl direkt ins erste Feld
+        # Finding 3: Nur die reine Seitenzahl
         if is_flat:
-            item.setText(get_col("page"), f"P. {pnum}")
+            #item.setText(get_col("page"), f"P. {pnum}")
+            item.setText(get_col("page"), str(pnum))
 
         item.setText(get_col("xref"), str(xr))
-        item.setText(get_col("size"), f"{sz:.2f}")
+        item.setText(get_col("size"), f"{sz:.2f}")  # Größe in KB
         item.setText(get_col("pixels"), f"{w}x{h}")
 
         # bbp Berechnung
-        try:
-            comp = 3 if "RGB" in str(cs) else (4 if "CMYK" in str(cs) else 1)
-            item.setText(get_col("bbp"), str(int(bpc) * comp))
-        except:
-            item.setText(get_col("bbp"), str(bpc))
+        # bbp Anzeige (Wert kommt bereits fertig berechnet als true_bbp aus der DB)
+        # Finding 1: bbp als dynamischer Wert
+        item.setText(get_col("bbp"), f"{bpc:.2f}")
+        # item.setText(get_col("bbp"), str(bpc))
 
+        #item.setText(get_col("dpi"), str(dpi))
+        # Finding 4: DPI als reine Zahl
         item.setText(get_col("dpi"), str(dpi))
         item.setText(get_col("colorspace"), str(cs))
         item.setText(get_col("subsampling"), str(sub))
