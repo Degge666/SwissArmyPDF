@@ -10,6 +10,12 @@ __pycache__/
 env/
 venv/
 
+# Projekt-Spezifisch
+.spdf
+.json
+extracted_images/
+*.pdf
+
 # --- Deine spezifischen Verbote ---
 # Alle PDFs ignorieren
 *.pdf
@@ -46,6 +52,7 @@ Backlog/
 temp/
 dist/
 build/
+LOOT/
 
 # Toolkit-spezifische Loot-Ordner
 pages_*/
