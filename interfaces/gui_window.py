@@ -4,11 +4,13 @@ import json
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                              QPushButton, QProgressBar, QApplication, QLineEdit,
                              QTreeWidget, QTreeWidgetItem, QMenu, QHeaderView, QFrame)
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtCore import Qt
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
 import fitz
 from core.pdf_engine import SwissArmyPDFEngine
+from pathlib import Path
+from typing import Optional
 
 
 # --- DIESE KLASSE MUSS HIER OBEN STEHEN ---
@@ -63,6 +65,7 @@ class MainWindow(QMainWindow):
         # 1. Zuerst den Content (Tree) erstellen
         self.setup_content_area()
         self.setup_top_bar()
+        self.setup_manipulate_bar()
 
         # --- Initialisierung ---
         self.init_db_connection()
@@ -467,3 +470,71 @@ class MainWindow(QMainWindow):
             self.refresh_archive_list()
             self.current_doc_id = new_id
             self.refresh_tree_view()
+
+    def setup_manipulate_bar(self):
+        self.manipulate_bar = QHBoxLayout()
+        self.layout.insertLayout(1, self.manipulate_bar)   # direkt unter Top-Bar
+
+        self.btn_purge_waste = QPushButton("Purge Waste")
+        self.btn_purge_waste.clicked.connect(self.run_purge_waste)
+        self.manipulate_bar.addWidget(self.btn_purge_waste)
+        self.manipulate_bar.addStretch()
+
+    def run_purge_waste(self):
+        if not self.engine.current_pdf:
+            print("[!] Kein Dokument geladen")
+            return
+
+        from core.manipulate import Pipeline, purge_waste_action, ManipulateTask
+        from PyQt6.QtWidgets import QFileDialog
+        from pathlib import Path
+
+        input_path = Path(self.engine.current_pdf)
+        suggested = str(input_path.with_stem(input_path.stem + "_purged"))
+
+        out_path, _ = QFileDialog.getSaveFileName(
+            self, "Purged Datei speichern", suggested, "PDF Files (*.pdf)"
+        )
+
+        if not out_path:
+            return
+
+        # Pipeline ausführen
+        pipeline = Pipeline()
+        pipeline.add_task(ManipulateTask("PurgeWaste", purge_waste_action))
+        pipeline.run(str(input_path), out_path)
+
+        # Neue Datei registrieren (als Child + grün)
+        self.register_document(out_path, parent_doc_id=self.current_doc_id, color_hex="#00ff88")
+
+        print(f"[*] Purge Waste abgeschlossen → {out_path}")
+
+    def register_document(self, new_path: str, parent_doc_id: Optional[int] = None,
+                          color_hex: Optional[str] = None) -> int:
+        """Generische Registrierung einer neuen Datei im Archiv + Tree"""
+        if color_hex is None:
+            color_hex = "#ffffff"  # Default weiß
+
+        new_doc_id = self.engine.run_full_scan(new_path)
+
+        # Tree-Eintrag erstellen
+        root = self.archive_tree.invisibleRootItem()
+        item = QTreeWidgetItem()
+
+        item.setText(0, Path(new_path).name)
+        item.setData(0, Qt.ItemDataRole.UserRole, new_doc_id)
+        item.setForeground(0, QColor(color_hex))
+
+        if parent_doc_id is not None:
+            # Als Child unter dem Original-Dokument
+            for i in range(root.childCount()):
+                parent_item = root.child(i)
+                if parent_item.data(0, Qt.ItemDataRole.UserRole) == parent_doc_id:
+                    parent_item.addChild(item)
+                    parent_item.setExpanded(True)
+                    break
+        else:
+            # Als neues Top-Level Dokument
+            root.addTopLevelItem(item)
+
+        return new_doc_id
