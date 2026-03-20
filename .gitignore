@@ -11,8 +11,8 @@ env/
 venv/
 
 # Projekt-Spezifisch
-.spdf
-.json
+*.spdf
+*.json
 extracted_images/
 *.pdf
 
