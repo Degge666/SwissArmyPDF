@@ -15,7 +15,7 @@ python3 -c "import fitz, PyQt6, PIL" 2>/dev/null
 if [ $? -ne 0 ]; then
     echo "Dependencies missing. Attempting to install..."
 
-    if ! ping -c 1 -W 2 8.8.8.8 > /dev/null 2>&1; then
+    if ! ping -c 1 -W 2 8.8.8.8 > /dxev/null 2>&1; then
         echo "ERROR: No internet connection. Cannot install dependencies."
         exit 1
     fi

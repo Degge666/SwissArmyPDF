@@ -1,16 +1,23 @@
 #interfaces/gui_window.py
-import os
-import json
-from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-                             QPushButton, QProgressBar, QApplication, QLineEdit,
-                             QTreeWidget, QTreeWidgetItem, QMenu, QHeaderView, QFrame)
+from PyQt6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QPushButton, QProgressBar, QApplication, QLineEdit,
+    QTreeWidget, QTreeWidgetItem, QMenu, QHeaderView, QFrame, QSplitter, QStatusBar,
+    QFileDialog  # ← schon hinzugefügt für SaveDialog
+)
 from PyQt6.QtGui import QAction, QColor
 from PyQt6.QtCore import Qt
 from PyQt6.QtSql import QSqlDatabase, QSqlQuery
+
+from typing import Optional
 import fitz
 from core.pdf_engine import SwissArmyPDFEngine
+from core.manipulate import Pipeline, purge_waste_action, ManipulateTask  # ← HIER ERGÄNZEN!
 from pathlib import Path
-from typing import Optional
+import sqlite3
+import os
+
+
 
 
 # --- DIESE KLASSE MUSS HIER OBEN STEHEN ---
@@ -129,38 +136,6 @@ class MainWindow(QMainWindow):
         self.top_bar.addStretch()
         self.top_bar.addWidget(self.btn_hide_unchecked)
 
-    def setup_content_area(self):
-        self.content_area = QHBoxLayout()
-
-        # Archive Tree (Links)
-        self.archive_tree = QTreeWidget()
-        self.archive_tree.setHeaderLabel("Dokumenten Archiv")
-        self.archive_tree.setFixedWidth(200)
-        self.archive_tree.itemClicked.connect(self.on_doc_selected)
-
-        # Main Finder Tree (Mitte)
-        self.main_tree = QTreeWidget()
-        self.main_tree.setColumnCount(len(self.col_ids))
-        self.main_tree.setHeaderLabels(list(self.COLUMN_MAP.values()))
-        # Einfache Header-Sortierung
-        self.main_tree.setSortingEnabled(True)
-
-        # Header Features (Verschiebbar & Context Menu)
-        header = self.main_tree.header()
-        header.setSectionsMovable(True)
-        header.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        header.customContextMenuRequested.connect(self.on_header_context_menu)
-
-        # Persistenz-Trigger (Wiederhergestellt)
-        header.sectionMoved.connect(self.save_ui_settings)
-        header.sectionResized.connect(self.save_ui_settings)
-
-        self.main_tree.itemSelectionChanged.connect(self.on_selection_changed)
-        self.main_tree.itemChanged.connect(self.handle_item_changed)
-
-        self.content_area.addWidget(self.archive_tree)
-        self.content_area.addWidget(self.main_tree)
-        self.layout.addLayout(self.content_area)
 
     def toggle_flat_view(self, checked):
         if checked:
@@ -430,28 +405,11 @@ class MainWindow(QMainWindow):
         insp.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         insp.destroyed.connect(lambda: self.inspectors.remove(insp))
 
-    def on_doc_selected(self, item):
-        self.current_doc_id = item.data(0, Qt.ItemDataRole.UserRole)
-        query = QSqlQuery()
-        query.prepare("SELECT path FROM documents WHERE id = ?")
-        query.addBindValue(self.current_doc_id)
-        query.exec()
-        if query.next(): self.engine.current_pdf = query.value(0)
-        self.refresh_tree_view()
-
     def init_db_connection(self):
         if not QSqlDatabase.contains("qt_sql_default_connection"):
             db = QSqlDatabase.addDatabase("QSQLITE")
             db.setDatabaseName("project_data.spdf")
             db.open()
-
-    def refresh_archive_list(self):
-        self.archive_tree.clear()
-        query = QSqlQuery("SELECT id, name FROM documents ORDER BY id DESC")
-        while query.next():
-            item = QTreeWidgetItem([query.value(1)])
-            item.setData(0, Qt.ItemDataRole.UserRole, query.value(0))
-            self.archive_tree.addTopLevelItem(item)
 
     def update_progress(self, val):
         self.progress_bar.setValue(val)
@@ -459,17 +417,6 @@ class MainWindow(QMainWindow):
 
     def dragEnterEvent(self, e):
         if e.mimeData().hasUrls(): e.accept()
-
-    def dropEvent(self, e):
-        path = e.mimeData().urls()[0].toLocalFile()
-        if path.lower().endswith(".pdf"):
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(0)
-            new_id = self.engine.run_full_scan(path, progress_callback=self.update_progress)
-            self.progress_bar.setVisible(False)
-            self.refresh_archive_list()
-            self.current_doc_id = new_id
-            self.refresh_tree_view()
 
     def setup_manipulate_bar(self):
         self.manipulate_bar = QHBoxLayout()
@@ -480,61 +427,213 @@ class MainWindow(QMainWindow):
         self.manipulate_bar.addWidget(self.btn_purge_waste)
         self.manipulate_bar.addStretch()
 
-    def run_purge_waste(self):
-        if not self.engine.current_pdf:
-            print("[!] Kein Dokument geladen")
+    def on_doc_selected(self, item):
+        doc_id = item.data(0, Qt.ItemDataRole.UserRole)
+        q = QSqlQuery()
+        q.prepare("SELECT path FROM documents WHERE id = ?")
+        q.addBindValue(doc_id)
+        q.exec()
+        if q.next():
+            path = q.value(0)
+            self.status_bar.showMessage(f"Path: {path}")
+            self.engine.current_pdf = path
+            self.current_doc_id = doc_id
+            self.refresh_tree_view()
+
+    def setup_content_area(self):
+        self.content_area = QHBoxLayout()
+
+        # Links: Splitter mit Original + Derived
+        self.splitter = QSplitter(Qt.Orientation.Vertical)
+
+        self.archive_tree = QTreeWidget()
+        self.archive_tree.setHeaderLabel("Original Documents")
+        self.archive_tree.itemClicked.connect(self.on_doc_selected)
+
+        self.derived_tree = QTreeWidget()
+        self.derived_tree.setHeaderLabel("Derived Documents")
+        self.derived_tree.itemClicked.connect(self.on_doc_selected)
+
+        self.splitter.addWidget(self.archive_tree)
+        self.splitter.addWidget(self.derived_tree)
+
+        # Rechts: Analyse-Tabelle
+        self.main_tree = QTreeWidget()
+        self.main_tree.setColumnCount(len(self.col_ids))
+        self.main_tree.setHeaderLabels(list(self.COLUMN_MAP.values()))
+        self.main_tree.setSortingEnabled(True)
+
+        self.content_area.addWidget(self.splitter)
+        self.content_area.addWidget(self.main_tree)
+        self.layout.addLayout(self.content_area)
+
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
+
+    def dropEvent(self, e):
+        if not e.mimeData().hasUrls():
             return
 
-        from core.manipulate import Pipeline, purge_waste_action, ManipulateTask
-        from PyQt6.QtWidgets import QFileDialog
-        from pathlib import Path
+        path = e.mimeData().urls()[0].toLocalFile()
+        if not path.lower().endswith(".pdf"):
+            return
+
+        print(f"[DEBUG] Drag&Drop: Starte Import von {path}")
+
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+
+        new_id = self.engine.run_full_scan(path, progress_callback=self.update_progress)
+
+        self.progress_bar.setVisible(False)
+
+        if new_id == -1:
+            print("[ERROR] Scan fehlgeschlagen")
+            self.status_bar.showMessage("Fehler beim Scannen der Datei")
+            return
+
+        print(f"[DEBUG] Scan erfolgreich – neue doc_id = {new_id}")
+
+        self.refresh_archive_list()
+        self.current_doc_id = new_id
+        self.refresh_tree_view()
+        self.status_bar.showMessage(f"Importiert (Original): {Path(path).name}")
+
+    def register_document(self, new_path: str, color_hex: str = None) -> int:
+        """Update color override for a document (optional).
+        Does NOT add to tree anymore – tree is refreshed via refresh_archive_list.
+        """
+        q = QSqlQuery()
+        q.prepare("SELECT id FROM documents WHERE path = ?")
+        q.addBindValue(new_path)
+        q.exec()
+        if not q.next():
+            return -1
+        doc_id = q.value(0)
+
+        if color_hex:
+            conn = sqlite3.connect("project_data.spdf")
+            cursor = conn.cursor()
+            cursor.execute("UPDATE documents SET color_hex = ? WHERE id = ?", (color_hex, doc_id))
+            conn.commit()
+            conn.close()
+
+        return doc_id
+
+    def run_purge_waste(self):
+        if not self.engine.current_pdf:
+            self.status_bar.showMessage("Kein Dokument ausgewählt")
+            return
+
+        print(f"[DEBUG] Purge gestartet für {self.engine.current_pdf}")
 
         input_path = Path(self.engine.current_pdf)
         suggested = str(input_path.with_stem(input_path.stem + "_purged"))
 
-        out_path, _ = QFileDialog.getSaveFileName(
-            self, "Purged Datei speichern", suggested, "PDF Files (*.pdf)"
-        )
-
+        out_path, _ = QFileDialog.getSaveFileName(self, "Purged speichern", suggested, "PDF (*.pdf)")
         if not out_path:
             return
 
-        # Pipeline ausführen
         pipeline = Pipeline()
         pipeline.add_task(ManipulateTask("PurgeWaste", purge_waste_action))
         pipeline.run(str(input_path), out_path)
 
-        # Neue Datei registrieren (als Child + grün)
-        self.register_document(out_path, parent_doc_id=self.current_doc_id, color_hex="#00ff88")
+        print(f"[DEBUG] Purge-Datei erstellt: {out_path}")
 
-        print(f"[*] Purge Waste abgeschlossen → {out_path}")
+        new_id = self.engine.run_full_scan(out_path, parent_doc_id=self.current_doc_id)
 
-    def register_document(self, new_path: str, parent_doc_id: Optional[int] = None,
-                          color_hex: Optional[str] = None) -> int:
-        """Generische Registrierung einer neuen Datei im Archiv + Tree"""
-        if color_hex is None:
-            color_hex = "#ffffff"  # Default weiß
+        if new_id == -1:
+            self.status_bar.showMessage("Fehler beim Scannen der purged Datei")
+            return
 
-        new_doc_id = self.engine.run_full_scan(new_path)
+        print(f"[DEBUG] Purge erfolgreich – neue ID {new_id} mit parent {self.current_doc_id}")
 
-        # Tree-Eintrag erstellen
-        root = self.archive_tree.invisibleRootItem()
-        item = QTreeWidgetItem()
+        self.refresh_archive_list()
+        self.status_bar.showMessage(f"Purge abgeschlossen → {Path(out_path).name} (abgeleitet)")
 
-        item.setText(0, Path(new_path).name)
-        item.setData(0, Qt.ItemDataRole.UserRole, new_doc_id)
-        item.setForeground(0, QColor(color_hex))
+    def refresh_archive_list(self):
+        print("[DEBUG] refresh_archive_list() gestartet")
+        self.archive_tree.clear()
+        self.derived_tree.clear()
 
-        if parent_doc_id is not None:
-            # Als Child unter dem Original-Dokument
-            for i in range(root.childCount()):
-                parent_item = root.child(i)
-                if parent_item.data(0, Qt.ItemDataRole.UserRole) == parent_doc_id:
-                    parent_item.addChild(item)
-                    parent_item.setExpanded(True)
-                    break
-        else:
-            # Als neues Top-Level Dokument
-            root.addTopLevelItem(item)
+        query = QSqlQuery("""
+            SELECT id, name, parent_doc_id
+            FROM documents
+            ORDER BY name ASC
+        """)
 
-        return new_doc_id
+        original_count = 0
+        derived_count = 0
+
+        while query.next():
+            doc_id = query.value(0)
+            name = query.value(1)
+            parent_id = query.value(2)
+            print(f"[DEBUG] Typ von parent_id: {type(parent_id)!r}")
+
+            # Robuster Check: None, 0 oder leerer String → Original
+            is_original = (
+                parent_id is None or
+                parent_id == 0 or
+                (isinstance(parent_id, str) and parent_id.strip() == '')
+            )
+
+            parent_str = "NULL" if parent_id is None else repr(parent_id)
+            print(f"[DEBUG] Dokument id={doc_id}, name={name}, parent_doc_id={parent_str}")
+
+            item = QTreeWidgetItem([name])
+            item.setData(0, Qt.ItemDataRole.UserRole, doc_id)
+
+            if is_original:
+                self.archive_tree.addTopLevelItem(item)
+                original_count += 1
+                print("  → Original Tree")
+            else:
+                self.derived_tree.addTopLevelItem(item)
+                derived_count += 1
+                print(f"  → Derived Tree (parent={parent_id})")
+
+            if is_original:
+                color = "#f0f0f0"  # Original
+            else:
+                color = "#d0ffd0"  # Abgeleitet (erstmal nur Level 1)
+
+            item.setForeground(0, QColor(color))
+
+        self.archive_tree.update()  # Qt manchmal braucht das
+        self.derived_tree.update()
+
+        self.status_bar.showMessage(
+            f"Archive: {original_count} Originale, {derived_count} Abgeleitete"
+        )
+        print(f"[DEBUG] refresh_archive_list() beendet – {original_count + derived_count} Dokumente")
+
+    def dropEvent(self, e):
+        if not e.mimeData().hasUrls():
+            return
+
+        path = e.mimeData().urls()[0].toLocalFile()
+        if not path.lower().endswith(".pdf"):
+            return
+
+        print(f"[DEBUG] Drag&Drop: Starte Import von {path}")
+
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+
+        new_id = self.engine.run_full_scan(path, progress_callback=self.update_progress)
+
+        self.progress_bar.setVisible(False)
+
+        if new_id == -1:
+            print("[ERROR] Scan fehlgeschlagen")
+            self.status_bar.showMessage("Fehler beim Scannen der Datei")
+            return
+
+        print(f"[DEBUG] Scan erfolgreich – neue doc_id = {new_id}")
+
+        self.refresh_archive_list()
+        self.current_doc_id = new_id
+        self.refresh_tree_view()
+        self.status_bar.showMessage(f"Importiert (Original): {Path(path).name}")
+

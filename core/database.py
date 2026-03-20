@@ -1,6 +1,4 @@
 #core/database.py
-import sqlite3
-from pathlib import Path
 
 class PDFProjectDB:
     def __init__(self, db_path="project_data.spdf"):
